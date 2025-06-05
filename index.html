@@ -1,1 +1,153 @@
-<a href="snssdk1128://poi/goodsdetail?activity_id=1828175442584612">打开抖音</a>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>延时截图工具</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 20px 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #FF5722;
+        }
+        .result-area {
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .screenshot {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .settings {
+            margin: 20px 0;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+  <a href="snssdk1128://poi/goodsdetail?activity_id=1828175442584612">打开抖音</a>
+    <h1>设备延时截图工具</h1>
+    
+    <div class="settings">
+        <h3>截图设置</h3>
+        <div>
+            <label for="delay">延迟时间(秒):</label>
+            <input type="number" id="delay" min="1" max="30" value="5">
+        </div>
+    </div>
+    
+    <button id="captureBtn" class="btn">开始延时截图</button>
+    
+    <div id="countdownDisplay" class="countdown" style="display: none;"></div>
+    
+    <div id="resultArea" class="result-area">
+        <h3>截图结果</h3>
+        <div id="status"></div>
+        <div id="imageContainer"></div>
+    </div>
+
+    <script>
+        document.getElementById('captureBtn').addEventListener('click', async function() {
+            const button = this;
+            const countdownDisplay = document.getElementById('countdownDisplay');
+            const statusElement = document.getElementById('status');
+            const imageContainer = document.getElementById('imageContainer');
+            const delaySeconds = parseInt(document.getElementById('delay').value) || 5;
+            
+            // 禁用按钮
+            button.disabled = true;
+            
+            // 显示倒计时
+            countdownDisplay.style.display = 'block';
+            statusElement.textContent = '准备截图...';
+            
+            // 倒计时
+            for (let i = delaySeconds; i > 0; i--) {
+                countdownDisplay.textContent = i;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            countdownDisplay.textContent = '正在截图...';
+            statusElement.textContent = '正在处理截图请求...';
+            
+            try {
+                // 调用截图API
+                const response = await fetch('http://localhost:3000/screenshot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ timestamp: new Date().getTime() })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`服务器返回错误: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusElement.textContent = '截图成功!';
+                    
+                    // 显示截图
+                    imageContainer.innerHTML = '';
+                    const img = document.createElement('img');
+                    img.src = result.imageUrl;
+                    img.className = 'screenshot';
+                    img.alt = '设备截图';
+                    imageContainer.appendChild(img);
+                    
+                    // 添加下载链接
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = result.imageUrl;
+                    downloadLink.download = result.filename;
+                    downloadLink.textContent = '下载截图';
+                    downloadLink.style.display = 'block';
+                    downloadLink.style.margin = '10px 0';
+                    imageContainer.appendChild(downloadLink);
+                } else {
+                    statusElement.textContent = `截图失败: ${result.error}`;
+                }
+            } catch (error) {
+                statusElement.textContent = `错误: ${error.message}`;
+                console.error('截图请求失败:', error);
+            }
+            
+            // 重置UI
+            countdownDisplay.style.display = 'none';
+            button.disabled = false;
+        });
+    </script>
+</body>
+</html>
