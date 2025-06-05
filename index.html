@@ -1,3 +1,4 @@
+  
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -11,12 +12,22 @@
             margin: 0 auto;
             padding: 20px;
             text-align: center;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
         }
         .btn {
             background-color: #4CAF50;
             border: none;
             color: white;
-            padding: 15px 32px;
+            padding: 12px 24px;
             text-align: center;
             text-decoration: none;
             display: inline-block;
@@ -24,6 +35,10 @@
             margin: 20px 0;
             cursor: pointer;
             border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #45a049;
         }
         .btn:disabled {
             background-color: #cccccc;
@@ -35,10 +50,26 @@
             margin: 20px 0;
             color: #FF5722;
         }
-        .result-area {
-            margin-top: 30px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
+        .settings {
+            margin: 20px 0;
+            text-align: left;
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .server-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .connected {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .disconnected {
+            background-color: #f2dede;
+            color: #a94442;
         }
         .screenshot {
             max-width: 100%;
@@ -46,50 +77,123 @@
             margin-top: 20px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        .settings {
-            margin: 20px 0;
+        .setup-instructions {
             text-align: left;
-            background: #f9f9f9;
+            background: #f0f8ff;
             padding: 15px;
             border-radius: 4px;
+            margin: 20px 0;
+            border-left: 4px solid #4285f4;
+        }
+        code {
+            background: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-  <a href="snssdk1128://poi/goodsdetail?activity_id=1828175442584612">打开抖音</a>
-    <h1>设备延时截图工具</h1>
-    
-    <div class="settings">
-        <h3>截图设置</h3>
-        <div>
-            <label for="delay">延迟时间(秒):</label>
-            <input type="number" id="delay" min="1" max="30" value="5">
+    <div class="container">
+        <a href="snssdk1128://poi/goodsdetail?activity_id=1828175442584612">打开抖音</a>
+        <h1>设备延时截图工具</h1>
+        
+        <div id="serverStatus" class="server-status disconnected">
+            服务器状态: 未连接
         </div>
-    </div>
-    
-    <button id="captureBtn" class="btn">开始延时截图</button>
-    
-    <div id="countdownDisplay" class="countdown" style="display: none;"></div>
-    
-    <div id="resultArea" class="result-area">
-        <h3>截图结果</h3>
-        <div id="status"></div>
-        <div id="imageContainer"></div>
+        
+        <div id="setupInstructions" class="setup-instructions">
+            <h3>首次使用设置说明:</h3>
+            <ol>
+                <li>下载本地服务器脚本 <a href="https://github.com/yourusername/screenshot-tool/releases/download/v1.0/screenshot-server.js" download>screenshot-server.js</a></li>
+                <li>确保已安装 <a href="https://nodejs.org/" target="_blank">Node.js</a></li>
+                <li>安装依赖: <code>npm install express cors</code></li>
+                <li>运行服务器: <code>node screenshot-server.js</code></li>
+                <li>确保Android设备已连接并启用ADB调试</li>
+                <li>刷新此页面，状态应显示为"已连接"</li>
+            </ol>
+        </div>
+        
+        <div class="settings">
+            <h3>截图设置</h3>
+            <div>
+                <label for="delay">延迟时间(秒):</label>
+                <input type="number" id="delay" min="1" max="30" value="5">
+            </div>
+            <div>
+                <label for="serverUrl">本地服务器地址:</label>
+                <input type="text" id="serverUrl" value="http://localhost:3000" style="width: 200px;">
+            </div>
+        </div>
+        
+        <button id="testConnectionBtn" class="btn" style="background-color: #2196F3;">测试服务器连接</button>
+        <button id="captureBtn" class="btn">开始延时截图</button>
+        
+        <div id="countdownDisplay" class="countdown hidden"></div>
+        
+        <div id="resultArea">
+            <h3>截图结果</h3>
+            <div id="status"></div>
+            <div id="imageContainer"></div>
+        </div>
     </div>
 
     <script>
+        // 保存服务器URL到本地存储
+        if (localStorage.getItem('serverUrl')) {
+            document.getElementById('serverUrl').value = localStorage.getItem('serverUrl');
+        }
+        
+        // 测试服务器连接
+        document.getElementById('testConnectionBtn').addEventListener('click', async function() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const serverStatus = document.getElementById('serverStatus');
+            const statusElement = document.getElementById('status');
+            
+            localStorage.setItem('serverUrl', serverUrl);
+            
+            statusElement.textContent = '正在测试服务器连接...';
+            
+            try {
+                const response = await fetch(`${serverUrl}/ping`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    serverStatus.className = 'server-status connected';
+                    serverStatus.textContent = `服务器状态: 已连接 (${data.message})`;
+                    statusElement.textContent = '服务器连接成功!';
+                    document.getElementById('setupInstructions').classList.add('hidden');
+                } else {
+                    throw new Error(`服务器返回错误: ${response.status}`);
+                }
+            } catch (error) {
+                serverStatus.className = 'server-status disconnected';
+                serverStatus.textContent = '服务器状态: 连接失败';
+                statusElement.textContent = `连接失败: ${error.message}. 请确保本地服务器正在运行。`;
+                document.getElementById('setupInstructions').classList.remove('hidden');
+            }
+        });
+        
+        // 截图功能
         document.getElementById('captureBtn').addEventListener('click', async function() {
             const button = this;
             const countdownDisplay = document.getElementById('countdownDisplay');
             const statusElement = document.getElementById('status');
             const imageContainer = document.getElementById('imageContainer');
             const delaySeconds = parseInt(document.getElementById('delay').value) || 5;
+            const serverUrl = document.getElementById('serverUrl').value;
             
             // 禁用按钮
             button.disabled = true;
             
             // 显示倒计时
-            countdownDisplay.style.display = 'block';
+            countdownDisplay.classList.remove('hidden');
             statusElement.textContent = '准备截图...';
             
             // 倒计时
@@ -103,7 +207,7 @@
             
             try {
                 // 调用截图API
-                const response = await fetch('http://localhost:3000/screenshot', {
+                const response = await fetch(`${serverUrl}/screenshot`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -123,15 +227,14 @@
                     // 显示截图
                     imageContainer.innerHTML = '';
                     const img = document.createElement('img');
-                    img.src = result.imageUrl;
+                    img.src = `${serverUrl}${result.imageUrl}`;
                     img.className = 'screenshot';
                     img.alt = '设备截图';
                     imageContainer.appendChild(img);
                     
                     // 添加下载链接
                     const downloadLink = document.createElement('a');
-                    downloadLink.href = result.imageUrl;
-                    downloadLink.download = result.filename;
+                    downloadLink.href = `${serverUrl}${result.imageUrl}`;
                     downloadLink.textContent = '下载截图';
                     downloadLink.style.display = 'block';
                     downloadLink.style.margin = '10px 0';
@@ -145,8 +248,15 @@
             }
             
             // 重置UI
-            countdownDisplay.style.display = 'none';
+            countdownDisplay.classList.add('hidden');
             button.disabled = false;
+        });
+        
+        // 页面加载完成后自动测试连接
+        window.addEventListener('DOMContentLoaded', async () => {
+            setTimeout(() => {
+                document.getElementById('testConnectionBtn').click();
+            }, 1000);
         });
     </script>
 </body>
